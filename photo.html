@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>照片详情</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <canvas id="bgCanvas" class="bg-canvas" aria-hidden="true"></canvas>
+    <header class="site-header" role="banner">
+      <div class="container">
+        <h1 class="brand">Love · SXA</h1>
+        <p class="tagline">照片详情</p>
+      </div>
+    </header>
+
+    <main class="section-photo" aria-label="照片详情">
+      <div class="photo-detail container">
+        <a class="photo-back" href="index.html">← 返回相册</a>
+        <div class="photo-detail-grid">
+          <div class="photo-detail-media">
+            <img id="photoImage" alt="照片" />
+          </div>
+          <div class="photo-detail-meta">
+            <h2 id="photoTitle">照片</h2>
+            <p id="photoDate" class="photo-date"></p>
+            <p id="photoLocation" class="photo-location"></p>
+            <p id="photoText" class="photo-text"></p>
+            <div id="photoTags" class="photo-tags"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="site-footer" role="contentinfo">
+      <div class="container">
+        <p>© 2025 Love for SXA</p>
+      </div>
+    </footer>
+
+    <script src="photo.js"></script>
+  </body>
+  </html>
+
+

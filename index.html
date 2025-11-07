@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>爱与星河:在一起的五年时光</title>
+    <meta name="description" content="纪念 11 月 17 日与沈栩安的五周年：3D相册与时间线" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="site-header" role="banner">
+      <div class="container">
+        <h1 class="brand">爱与星河:在一起的五年时光</h1>
+        <p class="tagline"></p>
+      </div>
+    </header>
+
+    <!-- 相册：网格平铺 + 物理挤压 + 网格连线 -->
+    <section id="gallery" class="section-gallery" aria-label="三维相册">
+      <div class="gallery-sticky">
+        <div class="gallery-viewport">
+          <canvas id="meshCanvas" class="mesh-canvas" aria-hidden="true"></canvas>
+          <div class="scene-3d">
+            <div id="gallery3d" class="gallery-3d" aria-hidden="false"></div>
+          </div>
+          <div class="gallery-overlay">
+            <h2 class="gallery-title">爱之璀璨</h2>
+            <p class="gallery-subtitle"></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="site-footer" role="contentinfo">
+      <div class="container">
+        <p>2025年11月17日 爱你的中</p>
+      </div>
+    </footer>
+
+    <script src="script.js"></script>
+  </body>
+  </html>
+
+

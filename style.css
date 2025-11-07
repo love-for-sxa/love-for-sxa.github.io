@@ -1,0 +1,89 @@
+/* 基础排版与主题 */
+:root {
+  --bg: #0d0f14;
+  --fg: #f4f7fb;
+  --muted: #9aa3b2;
+  --accent: #ff6b81; /* 玫瑰红 */
+  --accent-2: #6bc5ff; /* 天蓝 */
+  --card: #141925;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: ui-sans-serif, -apple-system, Segoe UI, Roboto, Noto Sans, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji';
+  scroll-behavior: smooth;
+}
+
+/* 背景画布在最底层 */
+.bg-canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 999; pointer-events: none; display: block; }
+
+.container { width: min(1200px, 92vw); margin: 0 auto; position: relative; z-index: 2; }
+
+.site-header { position: relative; z-index: 2; padding: 32px 0 8px; border-bottom: 1px solid #1c2333; backdrop-filter: blur(6px); }
+.brand { margin: 0; font-weight: 800; letter-spacing: 1px; }
+.tagline { margin: 6px 0 0; color: var(--muted); }
+
+.site-footer { position: relative; z-index: 2; padding: 40px 0; border-top: 1px solid #1c2333; text-align: center; color: var(--muted); }
+
+/* 3D 螺旋相册布局（主页）留存 */
+.section-gallery { height: 100vh; position: relative; }
+.gallery-sticky { position: sticky; top: 0; height: 100vh; }
+.gallery-viewport { position: relative; width: 100%; height: 100%; overflow: hidden; isolation: isolate; }
+.gallery-3d {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+.scene-3d { position: absolute; inset: 0; z-index: 100; perspective: 1400px; transform-style: preserve-3d; }
+.mesh-canvas { position: absolute; inset: 0; pointer-events: none; z-index: 50; }
+
+.gallery-overlay { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 200; }
+.gallery-title { margin: 0 0 8px; font-size: clamp(22px, 5vw, 40px); text-shadow: 0 10px 40px rgba(0,0,0,.35); }
+.gallery-subtitle { margin: 0; color: var(--muted); }
+
+.photo-card {
+  position: absolute;
+  width: clamp(110px, 12vw, 200px);
+  background: var(--card);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0,0,0,.45), inset 0 0 1px rgba(255,255,255,.05);
+  transform-style: preserve-3d;
+  will-change: transform, opacity;
+  cursor: pointer;
+  z-index: 120;
+}
+.photo-card img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.photo-card::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(to bottom, rgba(0,0,0,.0), rgba(0,0,0,.2));
+}
+
+/* 移除时间线与爱心相关样式 */
+
+/* 可访问性微调 */
+@media (prefers-reduced-motion: reduce) {
+  .timeline-item { transition: none; }
+}
+
+/* 照片详情页 */
+.section-photo { position: relative; z-index: 2; padding: 40px 0 80px; }
+.photo-back { display: inline-block; margin: 12px 0 20px; color: var(--accent-2); text-decoration: none; }
+.photo-detail-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 24px; align-items: start; }
+.photo-detail-media img { width: 100%; height: auto; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+.photo-detail-meta { background: rgba(20,25,37,.65); border: 1px solid rgba(255,255,255,.06); border-radius: 10px; padding: 16px 18px; }
+.photo-date, .photo-location { color: var(--muted); margin: 6px 0; }
+.photo-text { margin: 14px 0 0; line-height: 1.8; }
+.photo-tags { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+.tag-chip { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); padding: 4px 8px; border-radius: 999px; font-size: 12px; color: var(--fg); }
+
+@media (max-width: 900px) {
+  .photo-detail-grid { grid-template-columns: 1fr; }
+}
+
+
