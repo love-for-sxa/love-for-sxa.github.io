@@ -5,6 +5,13 @@
   const locEl = document.getElementById('photoLocation');
   const textEl = document.getElementById('photoText');
   const tagsEl = document.getElementById('photoTags');
+  const prevBtn = document.getElementById('photoPrev');
+  const nextBtn = document.getElementById('photoNext');
+
+  const DEFAULT_TOTAL_PHOTOS = 136;
+  let totalPhotos = DEFAULT_TOTAL_PHOTOS;
+  let photosMeta = {};
+  let currentId = 1;
 
   function getQueryId() {
     const url = new URL(window.location.href);
@@ -29,35 +36,195 @@
     tagsEl.style.display = 'none';
   }
 
-  // ---- 背景动画 ----
-  function initBackground() {
+  function updateNavControls() {
+    if (!prevBtn || !nextBtn) return;
+    const isFirst = currentId <= 1;
+    const isLast = currentId >= totalPhotos;
+    prevBtn.disabled = isFirst;
+    nextBtn.disabled = isLast;
+    prevBtn.setAttribute('aria-disabled', String(isFirst));
+    nextBtn.setAttribute('aria-disabled', String(isLast));
+  }
+
+  function goTo(id) {
+    if (!Number.isFinite(id)) return;
+    const clamped = Math.max(1, Math.min(Math.floor(id), totalPhotos));
+    currentId = clamped;
+    const meta = photosMeta && (photosMeta[String(clamped)] ?? photosMeta[clamped]) || null;
+    render(clamped, meta);
+    updateNavControls();
+    const url = new URL(window.location.href);
+    url.searchParams.set('id', String(clamped));
+    window.history.replaceState(null, '', url.toString());
+  }
+
+  if (prevBtn) {
+    prevBtn.addEventListener('click', () => {
+      if (currentId > 1) {
+        goTo(currentId - 1);
+      }
+    });
+  }
+
+  if (nextBtn) {
+    nextBtn.addEventListener('click', () => {
+      if (currentId < totalPhotos) {
+        goTo(currentId + 1);
+      }
+    });
+  }
+
+  // ---- 背景动画：星空 + 流星雨 ----
+  function initStarfieldBackground() {
     const canvas = document.getElementById('bgCanvas');
-    const ctx = canvas.getContext('2d');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d', { alpha: true });
+    const stars = [];
+    const meteors = [];
     let dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const SCALE = 1.3; // 放大背景运动整体尺度
+    let width = 0;
+    let height = 0;
+
     function resize() {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      width = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+      height = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      canvas.width = Math.max(1, Math.floor(width * dpr));
+      canvas.height = Math.max(1, Math.floor(height * dpr));
+      rebuildStars();
+    }
+
+    function rebuildStars() {
+      stars.length = 0;
+      const base = Math.floor((width * height) / 7000);
+      const count = Math.max(280, base * 5);
+      for (let i = 0; i < count; i++) {
+        stars.push({
+          x: Math.random() * width,
+          y: Math.random() * height,
+          r: 1.2 + Math.random() * 1.6,
+          phase: Math.random() * Math.PI * 2,
+          speed: 0.4 + Math.random() * 0.7
+        });
+      }
+    }
+
+    resize();
+    window.addEventListener('resize', resize, { passive: true });
+
+    let lastTime = performance.now();
+
+    function frame(now) {
+      const dt = Math.min(0.05, (now - lastTime) / 1000);
+      lastTime = now;
+      const time = now / 1000;
+
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+
+      if (stars.length === 0) rebuildStars();
+
+      ctx.save();
+      ctx.shadowColor = 'rgba(255,255,255,0.45)';
+      ctx.shadowBlur = 6;
+      for (const s of stars) {
+        const alpha = 0.45 + 0.35 * Math.sin(s.phase + s.speed * time);
+        ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+
+      if (meteors.length < 10 && Math.random() < 0.08) {
+        const angle = ((35 + Math.random() * 20) * Math.PI) / 180;
+        const speed = 420 + Math.random() * 780;
+        const tail = 280 + Math.random() * 480;
+        const thickness = 1 + Math.random() * 2.5;
+        const hue = Math.floor(Math.random() * 360);
+        const sat = 70 + Math.random() * 20;
+        const light = 55 + Math.random() * 15;
+        meteors.push({
+          x: -200 - Math.random() * 400,
+          y: -120 - Math.random() * 240,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 0,
+          maxLife: 1.6 + Math.random() * 1.4,
+          tail,
+          thickness,
+          hue,
+          sat,
+          light
+        });
+      }
+
+      for (let i = meteors.length - 1; i >= 0; i--) {
+        const m = meteors[i];
+        m.life += dt;
+        m.x += m.vx * dt;
+        m.y += m.vy * dt;
+        const progress = Math.max(0, 1 - m.life / m.maxLife);
+        const headX = m.x;
+        const headY = m.y;
+        const speedLen = Math.hypot(m.vx, m.vy) || 1e-6;
+        const ux = m.vx / speedLen;
+        const uy = m.vy / speedLen;
+        const tailLen = m.tail * progress;
+        const tailX = headX - ux * tailLen;
+        const tailY = headY - uy * tailLen;
+
+        ctx.lineCap = 'round';
+        ctx.lineWidth = m.thickness;
+        const grad = ctx.createLinearGradient(tailX, tailY, headX, headY);
+        grad.addColorStop(0, `hsla(${m.hue}, ${m.sat}%, ${m.light}%, 0)`);
+        grad.addColorStop(1, `hsla(${m.hue}, ${m.sat}%, ${m.light}%, ${0.9 * progress})`);
+        ctx.strokeStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(tailX, tailY);
+        ctx.lineTo(headX, headY);
+        ctx.stroke();
+
+        if (m.life >= m.maxLife || headX > width + 400 || headY > height + 300) {
+          meteors.splice(i, 1);
+        }
+      }
+
+      requestAnimationFrame(frame);
+    }
+
+    requestAnimationFrame(frame);
+  }
+
+  // ---- 前景动画：太阳系 / 双星 / 三体 / 心形 ----
+  function initOverlayScenes() {
+    const canvas = document.getElementById('bgCanvasOverlay');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d', { alpha: true });
+    let dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const SCALE = 1.3;
+    const mode = Math.floor(1 + Math.random() * 4);
+    let state = {};
+
+    function resizeCanvas() {
       const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
       const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
       canvas.style.width = `${vw}px`;
       canvas.style.height = `${vh}px`;
       canvas.width = Math.max(1, Math.floor(vw * dpr));
       canvas.height = Math.max(1, Math.floor(vh * dpr));
+      setupState();
     }
-    resize();
-    window.addEventListener('resize', () => { dpr = Math.min(window.devicePixelRatio || 1, 2); resize(); setup(); });
 
-    // 选择模式：1=太阳系, 2=双星, 3=三体, 4=爱心
-    const mode = Math.floor(1 + Math.random() * 4);
-
-    // 公共中心：居中（0.5W, 0.5H），使用 canvas CSS 尺寸
     function center() {
-      const w = canvas.width / dpr, h = canvas.height / dpr;
+      const w = canvas.width / dpr;
+      const h = canvas.height / dpr;
       return { x: w * 0.5, y: h * 0.5, w, h };
     }
 
-    let state = {};
-
-    function setup() {
+    function setupState() {
       const { w, h } = center();
       if (mode === 1) setupSolar(w, h);
       else if (mode === 2) setupBinary(w, h);
@@ -66,11 +233,12 @@
     }
 
     function setupSolar(w, h) {
-      const cx = w * 0.8, cy = h * 0.75;
+      const cx = w * 0.8;
+      const cy = h * 0.75;
       const rings = 8;
       const planets = [];
       for (let i = 0; i < rings; i++) {
-        const r = (40 + i * 28 + Math.random() * 10) * SCALE*0.5;
+        const r = (40 + i * 28 + Math.random() * 10) * SCALE * 0.5;
         const ang = Math.random() * Math.PI * 2;
         const speed = (0.15 + i * 0.03) * (Math.random() * 0.6 + 0.7);
         const size = (3 + Math.random() * 5) * (0.6 + 0.4 * SCALE);
@@ -81,14 +249,16 @@
     }
 
     function setupBinary(w, h) {
-      const cx = w * 0.8, cy = h * 0.75;
+      const cx = w * 0.8;
+      const cy = h * 0.75;
       const r = Math.min(w, h) * 0.12 * SCALE;
-      const omega = 0.8; // rad/s
+      const omega = 0.8;
       state = { type: 'binary', cx, cy, r, a: Math.random() * Math.PI * 2, omega };
     }
 
     function setupThreeBody(w, h) {
-      const cx = w * 0.8, cy = h * 0.75;
+      const cx = w * 0.8;
+      const cy = h * 0.75;
       const bodies = [];
       const spread = Math.min(w, h) * 0.2 * SCALE;
       for (let i = 0; i < 3; i++) {
@@ -101,110 +271,142 @@
           trail: []
         });
       }
-      state = { type: 'three', bodies, cx, cy };
+      state = { type: 'three', bodies };
     }
 
     function setupHeart(w, h) {
-      const cx = w * 0.8, cy = h * 0.75;
+      const cx = w * 0.8;
+      const cy = h * 0.75;
       const scale = Math.min(w, h) * 0.01 * SCALE;
       state = { type: 'heart', t: Math.random() * Math.PI * 2, cx, cy, s: scale };
     }
 
-    setup();
-
     function step(dt) {
-      const { w, h } = center();
-      // 先用像素尺寸清屏，再设定DPR变换，后续用CSS坐标绘制
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
+      const { x: centerX, y: centerY, w, h } = center();
+
       if (state.type === 'solar') {
-        // sun
-        const { cx, cy, planets } = state;
-        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 40);
-        grad.addColorStop(0, 'rgba(255,170,60,1)');
-        grad.addColorStop(1, 'rgba(255,80,20,0.6)');
+        const { cx: sx, cy: sy, planets } = state;
+        const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, 40);
+        grad.addColorStop(0, 'rgba(255,170,60,0.85)');
+        grad.addColorStop(1, 'rgba(255,80,20,0.5)');
         ctx.fillStyle = grad;
-        ctx.beginPath(); ctx.arc(cx, cy, 18, 0, Math.PI * 2); ctx.fill();
-        // orbits
+        ctx.beginPath();
+        ctx.arc(sx, sy, 18, 0, Math.PI * 2);
+        ctx.fill();
+
         ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-        planets.forEach(p => { ctx.beginPath(); ctx.arc(cx, cy, p.r, 0, Math.PI * 2); ctx.stroke(); });
-        // planets
-        planets.forEach(p => {
+        planets.forEach((p) => {
+          ctx.beginPath();
+          ctx.arc(sx, sy, p.r, 0, Math.PI * 2);
+          ctx.stroke();
+        });
+
+        planets.forEach((p) => {
           p.ang += p.speed * dt;
-          const x = cx + Math.cos(p.ang) * p.r;
-          const y = cy + Math.sin(p.ang) * p.r;
+          const x = sx + Math.cos(p.ang) * p.r;
+          const y = sy + Math.sin(p.ang) * p.r;
           ctx.fillStyle = `hsl(${p.hue} 80% 60%)`;
-          ctx.beginPath(); ctx.arc(x, y, p.size, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath();
+          ctx.arc(x, y, p.size, 0, Math.PI * 2);
+          ctx.fill();
         });
       }
 
       if (state.type === 'binary') {
-        const { cx, cy, r } = state; state.a += state.omega * dt;
-        const x1 = cx + Math.cos(state.a) * r;
-        const y1 = cy + Math.sin(state.a) * r;
-        const x2 = cx - Math.cos(state.a) * r;
-        const y2 = cy - Math.sin(state.a) * r;
-        // faint orbit
+        const { cx: bx, cy: by, r } = state;
+        state.a += state.omega * dt;
+        const x1 = bx + Math.cos(state.a) * r;
+        const y1 = by + Math.sin(state.a) * r;
+        const x2 = bx - Math.cos(state.a) * r;
+        const y2 = by - Math.sin(state.a) * r;
+
         ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
-        ctx.fillStyle = 'rgba(255,80,80,0.9)'; ctx.beginPath(); ctx.arc(x1, y1, 8, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = 'rgba(80,150,255,0.9)'; ctx.beginPath(); ctx.arc(x2, y2, 8, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath();
+        ctx.arc(bx, by, r, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.fillStyle = 'rgba(255,80,80,0.85)';
+        ctx.beginPath();
+        ctx.arc(x1, y1, 8, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(80,150,255,0.85)';
+        ctx.beginPath();
+        ctx.arc(x2, y2, 8, 0, Math.PI * 2);
+        ctx.fill();
       }
 
       if (state.type === 'three') {
-        const G = 8000, maxAcc = 800; // clamp acceleration
-        const { bodies } = state;
-        // compute pairwise forces
+        const bodies = state.bodies;
+        const G = 8000;
+        const maxAcc = 800;
         for (let i = 0; i < bodies.length; i++) {
-          let ax = 0, ay = 0;
-          for (let j = 0; j < bodies.length; j++) if (i !== j) {
+          let ax = 0;
+          let ay = 0;
+          for (let j = 0; j < bodies.length; j++) {
+            if (i === j) continue;
             const dx = bodies[j].x - bodies[i].x;
             const dy = bodies[j].y - bodies[i].y;
-            const r2 = dx*dx + dy*dy // clamp min radius^2
+            const r2 = Math.max(dx * dx + dy * dy, 400);
             const invr = 1 / Math.sqrt(r2);
             const invr3 = invr * invr * invr;
             let fx = G * dx * invr3;
             let fy = G * dy * invr3;
             const acc = Math.hypot(fx, fy);
             const cap = Math.min(acc, maxAcc);
-            if (acc > 1e-6) { fx *= (cap/acc); fy *= (cap/acc); }
-            ax += fx; ay += fy;
+            if (acc > 1e-6) {
+              const scale = cap / acc;
+              fx *= scale;
+              fy *= scale;
+            }
+            ax += fx;
+            ay += fy;
           }
           bodies[i].vx += ax * dt;
           bodies[i].vy += ay * dt;
-        // 限制 v max = 100
-        const v_max = 100;
-        const v = Math.hypot(bodies[i].vx, bodies[i].vy);
-        if (v > v_max) {
-          bodies[i].vx = bodies[i].vx * (v_max / v);
-          bodies[i].vy = bodies[i].vy * (v_max / v);
+          const v = Math.hypot(bodies[i].vx, bodies[i].vy);
+          const vmax = 100;
+          if (v > vmax) {
+            const scale = vmax / v;
+            bodies[i].vx *= scale;
+            bodies[i].vy *= scale;
+          }
         }
-        }
-        bodies.forEach(b => { b.x += b.vx * dt; b.y += b.vy * dt; });
-        // center by average position
-        const cxAvg = (bodies[0].x + bodies[1].x + bodies[2].x) / 3;
-        const cyAvg = (bodies[0].y + bodies[1].y + bodies[2].y) / 3;
-        const { x: cx, y: cy } = center();
-        const ox = cx - cxAvg, oy = cy - cyAvg;
-        bodies.forEach(b => { b.x += ox; b.y += oy; });
-        // update trails (screen-space) and draw trails
+
+        bodies.forEach((b) => {
+          b.x += b.vx * dt;
+          b.y += b.vy * dt;
+        });
+
+        const cxAvg = bodies.reduce((acc, b) => acc + b.x, 0) / bodies.length;
+        const cyAvg = bodies.reduce((acc, b) => acc + b.y, 0) / bodies.length;
+        const ox = centerX - cxAvg;
+        const oy = centerY - cyAvg;
+        bodies.forEach((b) => {
+          b.x += ox;
+          b.y += oy;
+        });
+
         const MAX_TRAIL = 120;
-        bodies.forEach(b => {
-          const px = b.x + cx * 0.6;
-          const py = b.y + cy * 0.5;
+        bodies.forEach((b) => {
+          const px = b.x + centerX * 0.6;
+          const py = b.y + centerY * 0.5;
           b.trail.push({ x: px, y: py });
           if (b.trail.length > MAX_TRAIL) b.trail.shift();
         });
+
         ctx.save();
-        bodies.forEach(b => {
+        bodies.forEach((b) => {
           const tr = b.trail;
           if (!tr || tr.length < 2) return;
           for (let i = 1; i < tr.length; i++) {
             const tfrac = i / (tr.length - 1);
-            ctx.globalAlpha = 0.08 + 0.6 * tfrac; // newer segments更亮
-            ctx.lineWidth = 1 + 3 * tfrac; // 尾部逐渐变细
+            ctx.globalAlpha = 0.08 + 0.6 * tfrac;
+            ctx.lineWidth = 1 + 3 * tfrac;
             ctx.strokeStyle = b.color;
             ctx.beginPath();
             ctx.moveTo(tr[i - 1].x, tr[i - 1].y);
@@ -213,30 +415,47 @@
           }
         });
         ctx.restore();
-        // draw bodies on top
-        bodies.forEach(b => { ctx.globalAlpha = 1; ctx.fillStyle = b.color; ctx.beginPath(); ctx.arc(b.x + cx*0.6, b.y + cy*0.5, 7, 0, Math.PI*2); ctx.fill(); });
+
+        bodies.forEach((b) => {
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = b.color;
+          ctx.beginPath();
+          ctx.arc(b.x + centerX * 0.6, b.y + centerY * 0.5, 7, 0, Math.PI * 2);
+          ctx.fill();
+        });
       }
 
       if (state.type === 'heart') {
-        const { cx, cy } = state; state.t += dt * 0.9;
+        const { cx: hx, cy: hy } = state;
+        state.t += dt * 0.9;
         const t0 = state.t;
         const s = state.s;
-        const x = cx + s * Math.pow(Math.sin(t0), 3) * 16;
-        const y = cy - s * (13*Math.cos(t0) - 5*Math.cos(2*t0) - 2*Math.cos(3*t0) - Math.cos(4*t0));
-        // faint heart path
+        const x = hx + s * Math.pow(Math.sin(t0), 3) * 16;
+        const y = hy - s * (13 * Math.cos(t0) - 5 * Math.cos(2 * t0) - 2 * Math.cos(3 * t0) - Math.cos(4 * t0));
+
         ctx.strokeStyle = 'rgba(255,100,150,0.15)';
         ctx.beginPath();
-        for (let a = 0; a < Math.PI*2; a += 0.02) {
-          const hx = cx + s * Math.pow(Math.sin(a), 3) * 16;
-          const hy = cy - s * (13*Math.cos(a) - 5*Math.cos(2*a) - 2*Math.cos(3*a) - Math.cos(4*a));
-          if (a === 0) ctx.moveTo(hx, hy); else ctx.lineTo(hx, hy);
+        for (let a = 0; a < Math.PI * 2; a += 0.02) {
+          const px = hx + s * Math.pow(Math.sin(a), 3) * 16;
+          const py = hy - s * (13 * Math.cos(a) - 5 * Math.cos(2 * a) - 2 * Math.cos(3 * a) - Math.cos(4 * a));
+          if (a === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
         }
-        ctx.closePath(); ctx.stroke();
-        // star
+        ctx.closePath();
+        ctx.stroke();
+
         ctx.fillStyle = 'rgba(255,80,160,0.95)';
-        ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x, y, 7, 0, Math.PI * 2);
+        ctx.fill();
       }
     }
+
+    resizeCanvas();
+    window.addEventListener('resize', () => {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      resizeCanvas();
+    }, { passive: true });
 
     let last = performance.now();
     function loop(now) {
@@ -262,17 +481,24 @@
       const res = await fetch('./data/photos.json', { cache: 'no-store' });
       if (!res || !res.ok) throw new Error('无法加载照片描述JSON');
       const all = await res.json();
-      let meta = null;
       if (all && all.photos) {
-        meta = all.photos[String(id)] ?? all.photos[id] ?? null;
+        photosMeta = all.photos;
+        const numericKeys = Object.keys(all.photos)
+          .map(Number)
+          .filter((n) => Number.isFinite(n) && n > 0);
+        if (numericKeys.length) {
+          const highest = Math.max(...numericKeys);
+          if (highest > totalPhotos) totalPhotos = highest;
+        }
       }
-      render(id, meta);
     } catch (e) {
       console.error('加载文字失败:', e);
-      render(id, null);
+      photosMeta = {};
     }
 
-    initBackground();
+    initStarfieldBackground();
+    initOverlayScenes();
+    goTo(id);
   }
 
   function getNumberOrDefault(v, d){ return Number.isFinite(v) ? v : d; }

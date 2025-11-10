@@ -644,9 +644,250 @@ function setupTimeline() {
   window.addEventListener('resize', render);
 }
 
+// --- 翻牌计时器 ---
+
+function diffCalendar(startDate, endDate) {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return {
+      years: 0, months: 0, days: 0, hours: 0, minutes: 0, seconds: 0
+    };
+  }
+  let from = start;
+  let to = end;
+  if (to < from) {
+    [from, to] = [to, from];
+  }
+  let temp = new Date(from);
+  let years = 0;
+  while (true) {
+    const next = new Date(temp);
+    next.setFullYear(next.getFullYear() + 1);
+    if (next <= to) {
+      temp = next;
+      years++;
+    } else {
+      break;
+    }
+  }
+  let months = 0;
+  while (true) {
+    const next = new Date(temp);
+    next.setMonth(next.getMonth() + 1);
+    if (next <= to) {
+      temp = next;
+      months++;
+    } else {
+      break;
+    }
+  }
+  let days = 0;
+  while (true) {
+    const next = new Date(temp);
+    next.setDate(next.getDate() + 1);
+    if (next <= to) {
+      temp = next;
+      days++;
+    } else {
+      break;
+    }
+  }
+  const remainingMs = to - temp;
+  const totalSeconds = Math.floor(remainingMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return { years, months, days, hours, minutes, seconds };
+}
+
+class FlipDigit {
+  constructor(root, initial = '0', direction = 'down') {
+    this.root = root;
+    this.duration = 600;
+    this.direction = direction;
+    this.frontNode = root.querySelector('.front');
+    this.backNode = root.querySelector('.back');
+    this.isFlipping = false;
+    this.nextValue = null;
+    this.currentValue = null;
+    root.className = `flip ${direction}`;
+    this._setFront(initial);
+    this._setBack(initial);
+    this.currentValue = initial;
+  }
+
+  _setFront(char) {
+    this.frontNode.className = `digital front number${char}`;
+  }
+
+  _setBack(char) {
+    this.backNode.className = `digital back number${char}`;
+  }
+
+  flipTo(char) {
+    if (this.currentValue === char) {
+      this.nextValue = null;
+      return;
+    }
+    if (this.isFlipping) {
+      this.nextValue = char;
+      return;
+    }
+    this.isFlipping = true;
+    this.nextValue = null;
+    this._setBack(char);
+    this.root.classList.remove('go');
+    void this.root.offsetWidth;
+    this.root.classList.add('go');
+    setTimeout(() => {
+      this._setFront(char);
+      this.currentValue = char;
+      this.root.classList.remove('go');
+      this.isFlipping = false;
+      if (this.nextValue && this.nextValue !== this.currentValue) {
+        const pending = this.nextValue;
+        this.nextValue = null;
+        this.flipTo(pending);
+      }
+    }, this.duration);
+  }
+
+  setImmediate(char) {
+    this.isFlipping = false;
+    this.nextValue = null;
+    this.currentValue = char;
+    this.root.classList.remove('go');
+    this._setFront(char);
+    this._setBack(char);
+  }
+}
+
+class FlipClock {
+  constructor(root, options = {}) {
+    this.root = root;
+    this.startDate = options.startDate || new Date('2020-11-17T00:00:00');
+    this.direction = options.direction || 'down';
+    this.units = [
+      { id: 'years', label: '年', digits: [] },
+      { id: 'months', label: '月', digits: [] },
+      { id: 'days', label: '日', digits: [] },
+      { id: 'hours', label: '小时', digits: [] },
+      { id: 'minutes', label: '分钟', digits: [] },
+      { id: 'seconds', label: '秒', digits: [] }
+    ];
+    this.timer = null;
+    this._build();
+    this.initialized = false;
+    this._update();
+    this._start();
+  }
+
+  dispose() {
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+  }
+
+  _build() {
+    const frag = document.createDocumentFragment();
+    this.units.forEach((unit, idx) => {
+      const unitEl = document.createElement('div');
+      unitEl.className = 'flip-unit';
+      const digitsEl = document.createElement('div');
+      digitsEl.className = 'flip-digits';
+      unitEl.appendChild(digitsEl);
+      const labelEl = document.createElement('span');
+      labelEl.className = 'flip-unit-label';
+      labelEl.textContent = unit.label;
+      unitEl.appendChild(labelEl);
+      unit.container = digitsEl;
+      unit.labelEl = labelEl;
+      frag.appendChild(unitEl);
+    });
+    this.root.textContent = '';
+    this.root.appendChild(frag);
+  }
+
+  _ensureDigits(unit, targetLen) {
+    while (unit.digits.length < targetLen) {
+      const digitObj = this._createDigit('0');
+      unit.container.insertBefore(digitObj.root, unit.container.firstChild);
+      unit.digits.unshift(digitObj);
+    }
+    while (unit.digits.length > targetLen) {
+      const digitObj = unit.digits.shift();
+      digitObj.root.remove();
+    }
+  }
+
+  _createDigit(initial) {
+    const wrap = document.createElement('div');
+    wrap.className = 'flip';
+    const front = document.createElement('div');
+    front.className = 'digital front';
+    const back = document.createElement('div');
+    back.className = 'digital back';
+    wrap.appendChild(front);
+    wrap.appendChild(back);
+    const digit = new FlipDigit(wrap, initial, this.direction);
+    return { root: wrap, control: digit };
+  }
+
+  _setDigits(unit, valueStr, animate) {
+    this._ensureDigits(unit, valueStr.length);
+    for (let i = 0; i < valueStr.length; i++) {
+      const char = valueStr[valueStr.length - 1 - i];
+      const digitObj = unit.digits[unit.digits.length - 1 - i];
+      if (!animate) {
+        digitObj.control.setImmediate(char);
+      } else {
+        digitObj.control.flipTo(char);
+      }
+    }
+  }
+
+  _update() {
+    const now = new Date();
+    const parts = diffCalendar(this.startDate, now);
+    const animate = this.initialized;
+    this._setDigits(this.units[0], String(parts.years), animate);
+    this._setDigits(this.units[1], String(parts.months).padStart(2, '0'), animate);
+    this._setDigits(this.units[2], String(parts.days).padStart(2, '0'), animate);
+    this._setDigits(this.units[3], String(parts.hours).padStart(2, '0'), animate);
+    this._setDigits(this.units[4], String(parts.minutes).padStart(2, '0'), animate);
+    this._setDigits(this.units[5], String(parts.seconds).padStart(2, '0'), animate);
+    if (!this.initialized) this.initialized = true;
+  }
+
+  _start() {
+    this.dispose();
+    this.timer = setInterval(() => this._update(), 1000);
+  }
+}
+
+function initElapsedFlipClock() {
+  const root = document.getElementById('elapsedFlipClock');
+  if (!root) return null;
+  const startAttr = root.dataset.start;
+  let startDate = null;
+  if (startAttr) {
+    const parsed = new Date(startAttr);
+    if (!Number.isNaN(parsed.getTime())) {
+      startDate = parsed;
+    }
+  }
+  if (!startDate) {
+    startDate = new Date('2020-11-17T00:00:00+08:00');
+  }
+  return new FlipClock(root, { startDate });
+}
+
 // --- 启动 ---
 window.addEventListener('DOMContentLoaded', () => {
   createSpiralGallery();
+  initElapsedFlipClock();
 });
 
 

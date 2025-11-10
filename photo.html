@@ -8,6 +8,7 @@
   </head>
   <body>
     <canvas id="bgCanvas" class="bg-canvas" aria-hidden="true"></canvas>
+    <canvas id="bgCanvasOverlay" class="bg-canvas bg-canvas-overlay" aria-hidden="true"></canvas>
     <header class="site-header" role="banner">
       <div class="container">
         <h1 class="brand">Love · SXA</h1>
@@ -17,7 +18,13 @@
 
     <main class="section-photo" aria-label="照片详情">
       <div class="photo-detail container">
-        <a class="photo-back" href="index.html">← 返回相册</a>
+        <div class="photo-nav">
+          <a class="photo-back" href="index.html">← 返回相册</a>
+          <div class="photo-nav-controls" role="group" aria-label="照片切换">
+            <button id="photoPrev" class="photo-nav-button" type="button">上一张</button>
+            <button id="photoNext" class="photo-nav-button" type="button">下一张</button>
+          </div>
+        </div>
         <div class="photo-detail-grid">
           <div class="photo-detail-media">
             <img id="photoImage" alt="照片" />
