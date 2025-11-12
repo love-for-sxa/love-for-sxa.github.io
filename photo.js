@@ -7,11 +7,15 @@
   const tagsEl = document.getElementById('photoTags');
   const prevBtn = document.getElementById('photoPrev');
   const nextBtn = document.getElementById('photoNext');
+  const affirmationsEl = document.getElementById('photoAffirmations');
+  const heartStageEl = affirmationsEl ? affirmationsEl.querySelector('.photo-heart-stage') : null;
+  const affirmationButtons = affirmationsEl ? Array.from(affirmationsEl.querySelectorAll('.photo-affirmation-button')) : [];
 
   const DEFAULT_TOTAL_PHOTOS = 136;
   let totalPhotos = DEFAULT_TOTAL_PHOTOS;
   let photosMeta = {};
   let currentId = 1;
+  let affirmationsReady = false;
 
   function getQueryId() {
     const url = new URL(window.location.href);
@@ -34,6 +38,8 @@
     dateEl.style.display = 'none';
     locEl.style.display = 'none';
     tagsEl.style.display = 'none';
+
+    updateAffirmationsVisibility(id);
   }
 
   function updateNavControls() {
@@ -503,6 +509,61 @@
 
   function getNumberOrDefault(v, d){ return Number.isFinite(v) ? v : d; }
 
+  function pickHeartColor() {
+    const hue = Math.floor(Math.random() * 360);
+    const sat = (70 + Math.random() * 20).toFixed(1);
+    const light = (50 + Math.random() * 20).toFixed(1);
+    return `hsl(${hue}, ${sat}%, ${light}%)`;
+  }
+
+  function spawnHeartFromButton(button) {
+    if (!affirmationsEl || !heartStageEl) return;
+    const containerRect = affirmationsEl.getBoundingClientRect();
+    if (!containerRect || containerRect.width <= 0) return;
+    const buttonRect = button.getBoundingClientRect();
+    const containerWidth = containerRect.width || 1;
+    const originX = buttonRect.left + buttonRect.width * 0.5;
+    const relativeX = (originX - containerRect.left) / containerWidth;
+    const jitter = (Math.random() - 0.5) * 0.3;
+    const clamped = Math.min(0.98, Math.max(0.02, relativeX + jitter));
+
+    const heart = document.createElement('div');
+    heart.className = 'floating-heart';
+    heart.style.left = `${(clamped * 100).toFixed(2)}%`;
+    heart.style.setProperty('--heart-color', pickHeartColor());
+    heart.style.setProperty('--heart-scale', (0.85 + Math.random() * 0.6).toFixed(2));
+    heart.style.setProperty('--heart-x-shift', `${((Math.random() - 0.5) * 70).toFixed(1)}px`);
+    const durationMs = Math.floor(1200 + Math.random() * 800);
+    heart.style.setProperty('--heart-duration', `${durationMs}ms`);
+
+    heartStageEl.appendChild(heart);
+    if (heartStageEl.children.length > 80) {
+      heartStageEl.removeChild(heartStageEl.firstElementChild);
+    }
+    heart.addEventListener('animationend', () => {
+      heart.remove();
+    }, { once: true });
+  }
+
+  function setupAffirmations() {
+    if (affirmationsReady) return;
+    if (!affirmationsEl || !heartStageEl || affirmationButtons.length === 0) return;
+    affirmationButtons.forEach((button) => {
+      button.addEventListener('click', () => spawnHeartFromButton(button));
+    });
+    affirmationsReady = true;
+  }
+
+  function updateAffirmationsVisibility(id) {
+    if (!affirmationsEl) return;
+    const shouldShow = Number(id) === 126;
+    affirmationsEl.hidden = !shouldShow;
+    if (!shouldShow && heartStageEl) {
+      heartStageEl.innerHTML = '';
+    }
+  }
+
+  setupAffirmations();
   window.addEventListener('DOMContentLoaded', main);
 })();
 
